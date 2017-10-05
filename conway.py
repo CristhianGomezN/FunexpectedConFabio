@@ -96,7 +96,7 @@ class game(object):
         plt.show()
     
     def export(self,filename):       
-        f = open(filename,'wr')
+        f = open(filename,'wt')
         siz=self.N*self.N
         rowNames=["step."]*(siz)
         for i in range (siz):
