@@ -10,7 +10,6 @@ import random as rnd
 class block:
     
     '''
-    
     Retorna una matrix invertible
     '''
     def generarmatriz(n):
@@ -19,14 +18,16 @@ class block:
         #Perform random start
         for i in range(n):
             for j in range(i+1,n):
-                U[i][j]=rnd.randint(0,1)
-                L[j][i]=rnd.randint(0,1)        
+                U[i][j]=int(rnd.randint(0,1))
+                L[j][i]=int(rnd.randint(0,1))       
         M=U.dot(L)
-        np.linalg.inv(M%2)
+#        np.linalg.inv(M%2)
         return M%2
     
     '''
-    Retorna la representación de la función basada en una matriz invertible 
+    Retorna la representación de la función basada en una matriz invertible
+    para cada uno de los elementos del bloque
+    @returns una lista de listas para cada elemento [ [ []...[]  ], [ []...[] ] ]
     '''
     def generarfuncion(n, mat, arr, s, automaton):
         rule = []
@@ -35,10 +36,10 @@ class block:
             cur = []
             for j in range(n):
                 if(mat[i][j]):
-                    add = [arr[j]]
-                    if(s > 0 and rnd.randint(0,1)):
-                        add = add + rnd.sample(automaton.lPermitida, k = rnd.randint(0, s))
-                    cur.append(add)
+#                    add = [ [arr[j]] for i in range(int(mat[i][j]))]
+                    cur.append([arr[j]])
+            if(s > 0 and rnd.randint(0,1)):
+                cur.append(rnd.sample(automaton.lPermitida, k = rnd.randint(0, s))) 
             rule.append(cur)
         automaton.lPermitida = automaton.lPermitida + list(arr) 
         return rule
@@ -49,6 +50,7 @@ class block:
     def __init__(self, n, arr, s, automaton):
         self.n = n
         self.rulemat = block.generarmatriz(n)
+        self.invmat = np.linalg.inv(self.rulemat)
         self.rule = block.generarfuncion(n, self.rulemat, arr, s, automaton)
         self.arr = arr
     
@@ -80,8 +82,8 @@ class automaton:
             a = block(2, [3,4], 0, self)
             a.rule = [[[3]], [[4]]]
             a.rulemat = np.array([[1,0],[0,1]])
-            b = block(3, [0,1,2], 3, self)
-            b.rule = [[[0], [3,4]], [[1], [0,3]], [[2], [0]]]
+            b = block(3, [0,1,2], 2, self)
+            b.rule = [[[0]], [[1], [0]], [[2], [0]]]
             b.rulemat = np.array([[1,0,0],[1,1,0],[1,0,1]])
             self.n = 5
             self.blocks = [a, b]
@@ -200,7 +202,11 @@ class automaton:
         k = 0
         s = ''
         s = s + "blocks len: " + str([(x.n) for x in self.blocks])
-        s = s +"\n" + str(self.seq) + "\n"                     
+        '''
+        for block in self.blocks:
+            s = s + "\n" + str(block.rulemat) + "\n" + str(block.invmat) + "\n"
+        '''
+        s = s +"\n" + str(self.seq)                     
         for ecn in self.key:
             cell= ''
             for i in range(len(ecn)):
@@ -212,7 +218,8 @@ class automaton:
                 else:
                     cell = cell + cur
             s = s + '\ny_' + str(k) + ' = ' + cell
-            k = k + 1   
+            k = k + 1
+        
         return s            
                 
 class encryption:
@@ -251,27 +258,38 @@ class encryption:
     
     def __str__(self):
         return str(self.composite)
-            
-B = encryption(5,2)
-aut0 = B.automatons[0]
-aut1 = B.automatons[1]
-print(B.automatons[0])
-print(B.automatons[1])
-print(B)
 
-s0 = set([])
-s1 = set([])
-s2 = set([])
-for i in range(32):
-    b0 = str(bin(i))[2:]
-    if(len(b0) < 5):
-        b0 = "0"*(5-len(b0)) + b0
-    e0 = B.encrypt(b0)
-    e1 = aut0.evolve(b0)
-    e2 = aut1.evolve(b0)
-    s0.add(e0)
-    s1.add(e1)
-    s2.add(e2)
-    print("plaintext: ", b0,"\n cyphertext0: ", e0,"\n cyphertext1: ", e1,"\n cyphertext2: ", e2)    
+k = 0
+while k < 32:
+    n = 20
+    test = min(2**n,10000)
+    B = encryption(n,2)
+    aut0 = B.automatons[0]
+    aut1 = B.automatons[1]
+    print("t = 0")
+    print( B.automatons[0])
+    print("t = 1")
+    print( B.automatons[1])
+    print("composite: ")
+    print(B)
 
+    s0 = set([])
+    s1 = set([])
+    s2 = set([])
+    for i in range(test):
+        b0 = str(bin(i))[2:]
+        if(len(b0) < n):
+            b0 = "0"*(n-len(b0)) + b0
+        e0 = B.encrypt(b0)
+            #    e1 = aut0.evolve(b0)
+#            e2 = aut1.evolve(b0)
+        s0.add(e0)
+            #    s1.add(e1)
+            #    s2.add(e2)
+        print("plaintext: ", b0,"cyphertext2: ", e0)    
+            #    print("plaintext: ", b0,"\n cyphertext0: ", e0,"\n cyphertext1: ", e1,"\n cyphertext2: ", e2)    
+    k = len(s0)
+    print(k)
 print("compuesta:", len(s0), "t=0", len(s1),"t=1", len(s2))
+
+print('<')
