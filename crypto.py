@@ -6,12 +6,29 @@ Created on Sat Oct 28 14:08:34 2017
 import numpy as np
 import random as rnd
 
+class term:
+    
+    def __init__(self, variables, aggregated):
+        self.var = variables
+        self.aggregated = aggregated
+        
+    def __getitem__(self, key):
+        return self.var[key]
+    
+    def __len__(self):
+        print(self.var)
+        return len(self.var)
+    
+    def __str__(self):
+        return str(self.var)
+        
+    
 class block:
     
     def generateMatrix(n):
         """Returns an invertible binary matrix of size n."""
-        U = np.identity(n);
-        L = np.identity(n);  
+        U = np.identity(n)
+        L = np.identity(n)  
         #Perform random start
         for i in range(n):
             for j in range(i+1,n):
@@ -51,10 +68,10 @@ class block:
         for i in range(n):
             cur = []
             for j in range(n):
-                if(mat[i][j]):
-                    cur.append([arr[j]])
+                if(mat[i][j] == 1):
+                    cur.append(term([arr[j]], False))
             if(s > 0 and rnd.randint(0,1)):
-                cur.append(rnd.sample(automaton.lPermitida,  k = min(2, rnd.randint(0, s))  )) 
+                cur.append(term(sorted(rnd.sample(automaton.lPermitida, k = min(2, rnd.randint(0, s)))), True) ) 
             rule.append(cur)
         automaton.lPermitida = automaton.lPermitida + list(arr) 
         return rule
@@ -160,12 +177,14 @@ class automaton:
     def combineBlockRule(ruleI, ruleJ):
         if(len(ruleI) == 0):
             return ruleJ
-        ruleI.sort()
-        ruleJ.sort()
         ans = []
         for i in range(len(ruleI)):
             for j in range(len(ruleJ)):
-                ans.append(automaton.merge(ruleI[i], ruleJ[j]))
+                print("type", type(ruleI[i]))
+                if(ruleI[i].aggregated or ruleJ[j].aggregated):
+                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]), True))
+                else:
+                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]),False))
         return ans
     
     
@@ -262,7 +281,7 @@ class encryption:
     def __str__(self):
         return str(self.composite)
 
-n = 10
+'''n = 10
 test = min(2**n,10000)
 B = encryption(n,2)
 aut0 = B.automatons[0]
@@ -272,4 +291,19 @@ print( B.automatons[0])
 print("t = 1")
 print( B.automatons[1])
 print("composite: ")
-print(B)
+print(B)'''
+
+n = 5
+U = np.identity(n)
+L = np.identity(n)  
+#Perform random start
+for i in range(n):
+    for j in range(i+1,n):
+        U[i][j]=int(rnd.randint(0,1))
+        L[j][i]=int(rnd.randint(0,1))       
+M=U.dot(L)
+print(M)
+M = M%2
+print("matrix: ",M)
+N = np.linalg.inv(M)
+print("inverse:", N)
