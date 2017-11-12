@@ -133,16 +133,24 @@ class block:
     
     def generateMatrix(n):
         """Returns an invertible binary matrix of size n."""
-        U = np.identity(n)
-        L = np.identity(n)  
-        #Perform random start
-        for i in range(n):
-            for j in range(i+1,n):
-                U[i][j]=int(rnd.getrandbits(1))
-                L[j][i]=int(rnd.getrandbits(1))       
-        M=U.dot(L)
-#        np.linalg.inv(M%2)
-        return M%2
+        finish = False
+        while not finish:
+            U = np.identity(n)
+            L = np.identity(n)  
+            #Perform random start
+            for i in range(n):
+                for j in range(i+1,n):
+                    U[i][j]=int(rnd.getrandbits(1))
+                    L[j][i]=int(rnd.getrandbits(1))       
+            M=U.dot(L)
+            M = M%2
+            Mi = np.linalg.inv(M)
+            finish = True
+            for i in range(n):
+                for j in range(n):
+                    if(not float.is_integer(Mi[i][j])):
+                        finish = False 
+        return M, Mi
     
     def generateEquations(n, mat, arr, s, automaton):
         """
@@ -184,7 +192,7 @@ class block:
     
     def __init__(self, n, arr, s, automaton):
         self.n = n
-        self.rulemat = block.generateMatrix(n)
+        self.rulemat, self.inv = block.generateMatrix(n)
         self.invmat = np.linalg.inv(self.rulemat)
         self.rule = block.generateEquations(n, self.rulemat, arr, s, automaton)
         self.arr = arr
@@ -333,7 +341,7 @@ class encryption:
         return self.composite.evolve(plain)
 
     def decrypt(self, ciphered):
-        """doesnt work"""
+        """now works"""
         assert self.n == len(ciphered)
         ciphered = list(map(lambda x : int(x) - int('0'), ciphered))
         i = 0
@@ -341,7 +349,7 @@ class encryption:
             val_range=0
             sol = [0]*self.n            
             for blo in aut.blocks:
-                inv_matrix = np.linalg.inv(blo.rulemat)
+                inv_matrix = blo.inv
                 inv_matrix = inv_matrix.astype(int)
                 for x in range(val_range, val_range + blo.n):
                     for trm in aut.key[x]:
@@ -373,8 +381,8 @@ def rndbin(n):
     return b0
 
 testC = 0
-n = 10
-t = 2
+n = 5
+t = 3
 style = ''
 test = min(2**n,10000)
 bintest = '01100'
@@ -391,21 +399,24 @@ if(testC):
     print(B.decrypt(e0))
     print("done")
 else:
-    B = encryption(n,t,style)
-    print("composite: ")
-    print(B)
-
-    s0 = set([])
-    for i in range(test):
-        b0 = str(bin(i))[2:]
-        if(len(b0) < n):
-            b0 = "0"*(n-len(b0)) + b0
-        e0  = B.encrypt(b0)
-        d0  = B.decrypt(e0)
-        print(b0, e0, d0)
-#        if(b0 != d0):
-#            print("<")
-        assert b0 == B.decrypt(e0)
-        s0.add(e0)
-#        print(b0, e0)
-    print("compuesta:", str(len(s0)) + "/" + str(test))
+    i = 0
+    while(i < 1):
+        B = encryption(n,t,style)
+#        print("composite: ")
+        print(B)
+        
+        s0 = set([])
+        for i in range(test):
+            b0 = str(bin(i))[2:]
+            if(len(b0) < n):
+                b0 = "0"*(n-len(b0)) + b0
+            e0  = B.encrypt(b0)
+            d0  = B.decrypt(e0)
+            print(b0, e0, d0)
+        #        if(b0 != d0):
+        #            print("<")
+            assert b0 == B.decrypt(e0)
+            s0.add(e0)
+        #        print(b0, e0)
+        print("compuesta:", str(len(s0)) + "/" + str(test))
+        i = i + 1
