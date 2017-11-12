@@ -5,6 +5,7 @@ Created on Sat Oct 28 14:08:34 2017
 
 import numpy as np
 import random as rnd
+import copy
 
 class term:
     
@@ -39,8 +40,7 @@ class term:
         return self.var < other.var
     
     def __eq__(self, other):
-        return self.var == other.var
-        
+        return self.var == other.var        
     
 class block:
     
@@ -113,37 +113,7 @@ class automaton:
     def __init__(self, n, rule = None):
         self.lPermitida = []
         
-        if(rule == 'A'):
-            a = block(3, [0,1,2], 0, self)
-            a.rule = [[ [1] ], [[2]],[[0]]]
-            a.rule = [[term(j) for j in i] for i in a.rule]
-            a.rulemat=np.array([[0,1,0],[0,0,1],[1,0,0]])
-            b = block(2, [3,4], 3, self)
-            b.rule = [[[4], [0,1]], [[3], [1,2]]]
-            b.rule = [[term(j) for j in i] for i in b.rule]
-            b.rulemat=np.array([[0,1],[1,0]])
-            self.n = 5
-            self.blocks = [a, b]
-            self.seq = [0,1,2,3,4]    
-            self.key = automaton.flatten(self.blocks)
-            self.blocklen = [(x.n) for x in self.blocks]
-            return 
-        elif(rule == 'B'):
-            a = block(2, [3,4], 0, self)
-            a.rule = [[[3]], [[4]]]
-            a.rule = [[term(j) for j in i] for i in a.rule]
-            a.rulemat = np.array([[1,0],[0,1]])
-            b = block(3, [0,1,2], 2, self)
-            b.rule = [[[0]], [[1], [0]], [[2], [0]]]
-            b.rule = [[term(j) for j in i] for i in b.rule]
-            b.rulemat = np.array([[1,0,0],[1,1,0],[1,0,1]])
-            self.n = 5
-            self.blocks = [a, b]
-            self.seq = [3,4,0,1,2]
-            self.key = automaton.flatten(self.blocks)    
-            self.blocklen = [(x.n) for x in self.blocks]
-            return
-        elif(rule == 'copy'):
+        if(rule == 'copy'):
             return
         self.n = n
         self.blocks = []
@@ -160,15 +130,6 @@ class automaton:
         self.blocklen = [(x.n) for x in self.blocks]
         self.key = automaton.flatten(self.blocks)
        
-        
-    def copy(self):
-        aut = automaton(self.n,'copy')
-        aut.n = self.n
-        aut.seq = self.seq
-        aut.key = self.key
-        aut.blocks = self.blocks
-        aut.blocklen = self.blocklen
-        return aut
     
     def flatten(blocks):
         ans = []
@@ -201,51 +162,41 @@ class automaton:
             j = j + 1
         return res  
     
-    def combineBlockRule(ruleI, ruleJ):
-        if(len(ruleI) == 0):
-            return ruleJ
+    def combineBlockRule(ruleI, ruleJ, k = 1):
         ans = []
+        if(len(ruleI) == 0):
+            ruleJ = copy.deepcopy(ruleJ)
+            for trm in ruleJ:
+                trm.coefficient = trm.coefficient*k
+            return ruleJ
+                               
         for i in range(len(ruleI)):
             for j in range(len(ruleJ)):
                 if(ruleI[i].aggregated or ruleJ[j].aggregated):
-                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]),True,ruleI[i].coefficient*ruleJ[j].coefficient))
+                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]),True,k*ruleI[i].coefficient*ruleJ[j].coefficient))
                 else:
-                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]),False,ruleI[i].coefficient*ruleJ[j].coefficient))
+                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]),False,k*ruleI[i].coefficient*ruleJ[j].coefficient))
         return ans
     
     
-    def combineAutomatons(self, other):
+    def combineAutomatons(self, other, normalize):
         """Composes itself with the other automaton, the other automaton being one step back in time."""
         otherRules = other.key
         #Por alguna razón el de abajo no funciona para t > 2
-        '''
         for i in range(self.n):
             replace = []
-            for j in range(len(self.key[i])):
+            ecn = self.key[i]
+            for trm in ecn:
                 add = []
-                for j in self.key[i][j]:
-                    add = automaton.combineBlockRule(add, otherRules[j])
+                for sym in trm:
+                    add = automaton.combineBlockRule(add, otherRules[sym], trm.coefficient)
                 replace = replace + add
+            replace.sort()
             self.key[i] = replace
-        self.normalizeKey()
-        '''        
-        #cada bloque [[{},...,{}],...,[{},...,{}]]
-        for i in range(len(self.blocks)):
-            rule = self.blocks[i].rule    
-            #cada elemento j de un bloque [{},...,{}] 
-            for j in range(self.blocks[i].n):
-                replace = []
-                #cada {}
-                for st in rule[j]:     
-                    add = []
-                    #cada elemento de {x1,..., xn}
-                    for l in st:
-                        add = automaton.combineBlockRule(add, otherRules[l])    
-                    replace = replace + add
-                self.blocks[i].rule[j] = replace
-#                self.key[k] = replace 
-#                k = k +1''''''
-    
+        if(normalize):
+            self.normalizeKey()
+                
+        
     def evolve(self, state):
         """Transforms the given state with this automaton rules"""
         assert len(state) == self.n
@@ -264,19 +215,19 @@ class automaton:
         return cypher
     
     def normalizeKey(self):
-        for i in range(n):
+        for i in range(self.n):    
             self.key[i].sort()
             ecn = self.key[i]
             j = 0
             unique = []            
             while j < len(ecn):
                 cur = self.key[i][j]
-                last = j
+                coef = 0
                 while j < len(ecn) and cur == self.key[i][j]:
+                    coef = coef + self.key[i][j].coefficient
                     j = j + 1
-                unique.append(term(cur.var, cur.aggregated,  j - last))
-            self.key[i] = unique
-        
+                unique.append(term(cur.var, cur.aggregated,  coef))
+            self.key[i] = unique    
  
     def __str__(self):
         k = 0
@@ -308,19 +259,15 @@ class encryption:
         self.automatons = []
         for i in range(t):
             self.automatons.append(automaton(n))
-        if(rule == 'guan'):
-            self.n = 5
-            self.t = 2
-            self.automatons = [automaton(5,'A'), automaton(5,'B')]
-        self.composite = self.automatons[t - 1].copy()
+        self.composite = copy.deepcopy(self.automatons[t - 1])
+        self.composite2 = copy.deepcopy(self.automatons[t - 1])
         for i in range(t-1):
-            automaton.combineAutomatons(self.composite, self.automatons[t - 2 - i])
-        #self.composite.normalizeKey()
+            self.composite.combineAutomatons(self.automatons[t-2-i], True)
         
     
     def encrypt(self, plain):
         """Encrypts give plain text by applying underlaying automaton rules"""
-        return self.composite.evolve(plain)
+        return self.composite.evolve(plain), self.composite2.evolve(plain)
 
     def decrypt(self, ciphered):
         """doesnt work"""
@@ -337,45 +284,32 @@ class encryption:
         return str(self.composite)
 testC = 0
 n = 400
-t = 2
+t = 3
 style = ''
 test = min(2**n,1000)
 if(testC):
     B = encryption(n,t,style)
     aut0 = B.automatons[0]
     aut1 = B.automatons[1]
-    print("t = 0")
-    print(type(aut0))
-    print( aut0)
-    print("t = 1")
-    print( aut1)
-    print("composite: ")
-    print(B)
-else:
-    B = encryption(n,t,style)
-    aut0 = B.automatons[0]
-    aut1 = B.automatons[1]
 #    print("t = 0")
+#    print(type(aut0))
 #    print( aut0)
 #    print("t = 1")
 #    print( aut1)
 #    print("composite: ")
 #    print(B)
+    print("done")
+else:
+    B = encryption(n,t,style)
+    print("composite: ")
+#    print(B)
 
     s0 = set([])
-    s1 = set([])
-    s2 = set([])
     for i in range(test):
         b0 = str(bin(i))[2:]
         if(len(b0) < n):
             b0 = "0"*(n-len(b0)) + b0
-        e0 = B.encrypt(b0)
-            #    e1 = aut0.evolve(b0)
-#            e2 = aut1.evolve(b0)
+        e0  = B.encrypt(b0)
         s0.add(e0)
-            #    s1.add(e1)
-            #    s2.add(e2)
-#        print("plaintext: ", b0,"cyphertext2: ", e0)    
-            #    print("plaintext: ", b0,"\n cyphertext0: ", e0,"\n cyphertext1: ", e1,"\n cyphertext2: ", e2)    
-    print("compuesta:", str(len(s0)) + "/" + str(test), "t=0", len(s1),"t=1", len(s2))
-
+        print(b0, e0)
+    print("compuesta:", str(len(s0)) + "/" + str(test))
