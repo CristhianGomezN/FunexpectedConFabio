@@ -13,9 +13,41 @@ class term:
         self.var = variables
         self.coefficient = coefficient
         self.aggregated = aggregated
+    
+
+    def merge(self, other, k = 1):
+        n = len(self)
+        m = len(other)
+        i = 0
+        j = 0
+        res = []
+        while i < n and j < m:
+            if(self[i] < other[j]):
+                res.append(self[i])
+                i = i + 1
+            elif(other[j] < self[i]):
+                res.append(other[j])
+                j = j + 1
+            else:
+                res.append(self[i])
+                i = i + 1
+                j = j + 1
+        while i < n:
+            res.append(self[i])
+            i = i + 1
+        while j < m:
+            res.append(other[j])
+            j = j + 1
+        return term(res, self.aggregated, k)
         
     def __getitem__(self, key):
         return self.var[key]
+    
+    def eval(self, vals):
+        ans = 1
+        for sym in self:
+            ans = ans*vals[sym]
+        return ans%2
     
     def __len__(self):
         return len(self.var)
@@ -25,22 +57,77 @@ class term:
         if(self.coefficient != 1):
             s = "" + str(self.coefficient)
         for sym in self.var:
-            s = s + "x_" + str(sym)
+            s = s + "x_" + str(sym + 1)
         return str(s)
     
     def __repr__(self):
-        s = ""
-        if(self.coefficient != 1):
-            s = "" + str(self.coefficient)
-        for sym in self.var:
-            s = s + "x_" + str(sym)
-        return str(s)
+        return str(self)
     
     def __lt__(self,other):
         return self.var < other.var
     
     def __eq__(self, other):
         return self.var == other.var        
+    
+class polynomial:
+    
+    def __init__(self, terms = []):
+        self.terms = terms
+        
+    def __len__(self):
+        return len(self.terms)
+    
+    def __add__(self, other):
+        return  polynomial(self.terms + other.terms)
+    
+    
+    def multp(self, other, k = 1):
+        ans = []
+        if(len(self) == 0):
+            ans = copy.deepcopy(other.terms)
+            for trm in ans:
+                trm.coefficient = trm.coefficient*k
+        else:
+            for i in range(len(self)):
+                for j in range(len(other)):
+                    coef = k*self[i].coefficient*other[j].coefficient
+                    if(coef%2 == 1):
+                        ans.append(self[i].merge(other[j], coef))                        
+        self.terms = ans
+    
+    def normalize(self):
+        self.terms.sort()
+        ecn = self.terms
+        i = 0
+        unique = []            
+        while i < len(ecn):
+            cur = self.terms[i]
+            coef = 0
+            while i < len(ecn) and cur == self.terms[i]:
+                coef = coef + self.terms[i].coefficient
+                i = i + 1
+            if(coef%2 == 1):    
+                unique.append(term(cur.var, cur.aggregated,  coef%2))
+        self.terms = unique
+    
+    def sort(self):
+        self.terms.sort()
+    
+    def __str__(self):
+        s = ''
+        for i in range(len(self)):
+            if i != len(self) - 1:
+                s = s + str(self.terms[i]) + ' + '
+            else:
+                s = s + str(self.terms[i])
+        return s
+    
+    def __getitem__(self, key):
+        return self.terms[key]
+    
+    def __repr__(self):
+        return str(self)
+    
     
 class block:
     
@@ -51,8 +138,8 @@ class block:
         #Perform random start
         for i in range(n):
             for j in range(i+1,n):
-                U[i][j]=int(rnd.randint(0,1))
-                L[j][i]=int(rnd.randint(0,1))       
+                U[i][j]=int(rnd.getrandbits(1))
+                L[j][i]=int(rnd.getrandbits(1))       
         M=U.dot(L)
 #        np.linalg.inv(M%2)
         return M%2
@@ -89,9 +176,9 @@ class block:
             for j in range(n):
                 if(mat[i][j] == 1):
                     cur.append(term([arr[j]], False))
-            if(s > 0 and rnd.randint(0,1)):
+            if(s > 0 and rnd.getrandbits(1)):
                 cur.append(term(sorted(rnd.sample(automaton.lPermitida, k = min(2, rnd.randint(1, s)))), True) ) 
-            rule.append(cur)
+            rule.append(polynomial(cur))
         automaton.lPermitida = automaton.lPermitida + list(arr) 
         return rule
     
@@ -137,59 +224,16 @@ class automaton:
             ans = ans + blocks[i].rule
         return ans
     
-    def merge(A, B):
-        n = len(A)
-        m = len(B)
-        i = 0
-        j = 0
-        res = []
-        while i < n and j < m:
-            if(A[i] < B[j]):
-                res.append(A[i])
-                i = i + 1
-            elif(B[j] < A[i]):
-                res.append(B[j])
-                j = j + 1
-            else:
-                res.append(A[i])
-                i = i + 1
-                j = j + 1
-        while i < n:
-            res.append(A[i])
-            i = i + 1
-        while j < m:
-            res.append(B[j])
-            j = j + 1
-        return res  
     
-    def combineBlockRule(ruleI, ruleJ, k = 1):
-        ans = []
-        if(len(ruleI) == 0):
-            ruleJ = copy.deepcopy(ruleJ)
-            for trm in ruleJ:
-                trm.coefficient = trm.coefficient*k
-            return ruleJ
-                               
-        for i in range(len(ruleI)):
-            for j in range(len(ruleJ)):
-                if(ruleI[i].aggregated or ruleJ[j].aggregated):
-                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]),True,k*ruleI[i].coefficient*ruleJ[j].coefficient))
-                else:
-                    ans.append(term(automaton.merge(ruleI[i], ruleJ[j]),False,k*ruleI[i].coefficient*ruleJ[j].coefficient))
-        return ans
-    
-    
-    def combineAutomatons(self, other, normalize):
+    def compose(self, other, normalize):
         """Composes itself with the other automaton, the other automaton being one step back in time."""
-        otherRules = other.key
-        #Por alguna razón el de abajo no funciona para t > 2
         for i in range(self.n):
-            replace = []
+            replace = polynomial()
             ecn = self.key[i]
             for trm in ecn:
-                add = []
+                add = polynomial()
                 for sym in trm:
-                    add = automaton.combineBlockRule(add, otherRules[sym], trm.coefficient)
+                    add.multp(other.key[sym], trm.coefficient)
                 replace = replace + add
             replace.sort()
             self.key[i] = replace
@@ -199,35 +243,22 @@ class automaton:
         
     def evolve(self, state):
         """Transforms the given state with this automaton rules"""
-        assert len(state) == self.n
-        data = list(map(lambda x : int(x) - int('0'), state))
-        cypher = ""
+        cypher = ''
         for ecn in self.key:
             cell=0
             for i in range(len(ecn)):
                 op = 1
                 trm = ecn[i]
                 for j in trm:
-                    op = op*data[j]
+                    op = op*state[j]
                 op = op*ecn[i].coefficient
                 cell = cell+op
             cypher = cypher + str(cell%2)
         return cypher
     
     def normalizeKey(self):
-        for i in range(self.n):    
-            self.key[i].sort()
-            ecn = self.key[i]
-            j = 0
-            unique = []            
-            while j < len(ecn):
-                cur = self.key[i][j]
-                coef = 0
-                while j < len(ecn) and cur == self.key[i][j]:
-                    coef = coef + self.key[i][j].coefficient
-                    j = j + 1
-                unique.append(term(cur.var, cur.aggregated,  coef))
-            self.key[i] = unique    
+        for poly in self.key:
+            poly.normalize()
  
     def __str__(self):
         k = 0
@@ -254,55 +285,115 @@ class encryption:
     
     def __init__(self, n, t, rule = None):
         """Form a encryption pattern."""
-        self.n = n
-        self.t = t
         self.automatons = []
-        for i in range(t):
-            self.automatons.append(automaton(n))
+        if(rule == 'guan'):
+            self.n = 5
+            self.t = 2
+            aut0 = automaton(5)
+            a = block(3, [0,1,2], 0, aut0)
+            a.rule = [polynomial([ term([1],False) ]), polynomial([term([2],False)]),polynomial([term([0],False)])]
+            a.rulemat=np.array([[0,1,0],[0,0,1],[1,0,0]])
+            b = block(2, [3,4], 3, aut0)
+            b.rule = [polynomial([term([4],False), term([0,1],True)]), polynomial([term([3],False), term([1,2],True)])]
+            b.rulemat=np.array([[0,1],[1,0]])
+            aut0.blocks = [a, b]
+            aut0.seq = [0,1,2,3,4]    
+            aut0.key = automaton.flatten(aut0.blocks)
+            self.automatons.append(aut0)
+            ######################################
+            aut1 = automaton(5)
+            a = block(2, [3,4], 0, aut1)
+            a.rule = [polynomial([term([3],False)]), polynomial([term([4],False)])]
+            a.rulemat = np.array([[1,0],[0,1]])
+            b = block(1, [0], 2, aut1)
+            b.rule = [polynomial([term([0],False), term([3,4], True)])] 
+            b.rulemat = np.array([[1]])
+            c = block(2, [1,2], 3, aut1)
+            c.rule = [polynomial([term([1],False), term([0,3], True)]), polynomial([term([2],False), term([0], True)])]
+            c.rulemat = np.array([[1,0],[0,1]])
+            aut1.blocks = [a, b, c]
+            aut1.seq = [3,4,0,1,2]
+            aut1.key = automaton.flatten(aut1.blocks)
+            self.automatons.append(aut1)
+        else:
+            self.n = n
+            self.t = t    
+            for i in range(t):
+                self.automatons.append(automaton(n))
         self.composite = copy.deepcopy(self.automatons[t - 1])
-        self.composite2 = copy.deepcopy(self.automatons[t - 1])
         for i in range(t-1):
-            self.composite.combineAutomatons(self.automatons[t-2-i], True)
+            self.composite.compose(self.automatons[t-2-i], True)
+        
         
     
     def encrypt(self, plain):
         """Encrypts give plain text by applying underlaying automaton rules"""
-        return self.composite.evolve(plain), self.composite2.evolve(plain)
+        assert self.n == len(plain)
+        plain = list(map(lambda x : int(x) - int('0'), plain))
+        return self.composite.evolve(plain)
 
     def decrypt(self, ciphered):
         """doesnt work"""
-        for aut in reversed(self.automatons):   
+        assert self.n == len(ciphered)
+        ciphered = list(map(lambda x : int(x) - int('0'), ciphered))
+        i = 0
+        for aut in reversed(self.automatons):
             val_range=0
+            sol = [0]*self.n            
             for blo in aut.blocks:
-                #Producto M^-1 (y1,y2,...,yn) = (x1,x2,...,xn)
                 inv_matrix = np.linalg.inv(blo.rulemat)
-                vals=ciphered[val_range : val_range + blo.n]
-                prod = np.matmul(inv_matrix, vals)
+                inv_matrix = inv_matrix.astype(int)
+                for x in range(val_range, val_range + blo.n):
+                    for trm in aut.key[x]:
+                        if(trm.aggregated):
+                            ciphered[x] = (ciphered[x] + trm.eval(sol))%2
+                prod = np.matmul(inv_matrix, ciphered[val_range:val_range + blo.n])
+                prod = list(prod)
+                k = 0
+                for x in blo.arr:
+                    sol[x] = prod[k]%2
+                    k = k + 1
                 val_range = val_range + blo.n
+            ciphered = copy.copy(sol)
+            i = i + 1
+        s = ''
+        for i in range(self.n):
+            s = s + str(sol[i])
+        return s
     
     def __str__(self):
         return str(self.composite)
+    
+
+def rndbin(n):
+    b0 = bin(rnd.getrandbits(n))[2:]
+    print(b0)
+    if(len(b0) < n):
+        b0 = '0'*(n-len(b0)) + b0
+    return b0
+
 testC = 0
-n = 400
-t = 3
+n = 10
+t = 2
 style = ''
-test = min(2**n,1000)
+test = min(2**n,10000)
+bintest = '01100'
+
 if(testC):
     B = encryption(n,t,style)
     aut0 = B.automatons[0]
     aut1 = B.automatons[1]
-#    print("t = 0")
-#    print(type(aut0))
-#    print( aut0)
-#    print("t = 1")
-#    print( aut1)
-#    print("composite: ")
-#    print(B)
+    print(B)
+    e0 = B.encrypt(bintest)
+    print("b0", bintest)
+    print("cypher", e0)
+    print("decryption")
+    print(B.decrypt(e0))
     print("done")
 else:
     B = encryption(n,t,style)
     print("composite: ")
-#    print(B)
+    print(B)
 
     s0 = set([])
     for i in range(test):
@@ -310,6 +401,11 @@ else:
         if(len(b0) < n):
             b0 = "0"*(n-len(b0)) + b0
         e0  = B.encrypt(b0)
+        d0  = B.decrypt(e0)
+        print(b0, e0, d0)
+#        if(b0 != d0):
+#            print("<")
+        assert b0 == B.decrypt(e0)
         s0.add(e0)
-        print(b0, e0)
+#        print(b0, e0)
     print("compuesta:", str(len(s0)) + "/" + str(test))
