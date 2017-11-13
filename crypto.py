@@ -1,4 +1,4 @@
-"""
+""""
 Created on Sat Oct 28 14:08:34 2017
 @author: Usuario
 """
@@ -299,9 +299,13 @@ class encryption:
             a = block(3, [0,1,2], 0, aut0)
             a.rule = [polynomial([ term([1],False) ]), polynomial([term([2],False)]),polynomial([term([0],False)])]
             a.rulemat=np.array([[0,1,0],[0,0,1],[1,0,0]])
+            a.inv = np.linalg.inv(a.rulemat)
+            a.inv = np.around(a.inv/np.linalg.det(a.inv)).astype(int)%2
             b = block(2, [3,4], 3, aut0)
             b.rule = [polynomial([term([4],False), term([0,1],True)]), polynomial([term([3],False), term([1,2],True)])]
-            b.rulemat=np.array([[0,1],[1,0]])
+            b.rulemat=np.array([[0,1],[1,0]])    
+            b.inv = np.linalg.inv(b.rulemat)
+            b.inv = np.around(b.inv/np.linalg.det(b.inv)).astype(int)%2
             aut0.blocks = [a, b]
             aut0.seq = [0,1,2,3,4]    
             aut0.key = automaton.flatten(aut0.blocks)
@@ -311,12 +315,18 @@ class encryption:
             a = block(2, [3,4], 0, aut1)
             a.rule = [polynomial([term([3],False)]), polynomial([term([4],False)])]
             a.rulemat = np.array([[1,0],[0,1]])
+            a.inv = np.linalg.inv(a.rulemat)
+            a.inv = np.around(a.inv/np.linalg.det(a.inv)).astype(int)%2
             b = block(1, [0], 2, aut1)
             b.rule = [polynomial([term([0],False), term([3,4], True)])] 
             b.rulemat = np.array([[1]])
+            b.inv = np.linalg.inv(b.rulemat)
+            b.inv = np.around(b.inv/np.linalg.det(b.inv)).astype(int)%2
             c = block(2, [1,2], 3, aut1)
             c.rule = [polynomial([term([1],False), term([0,3], True)]), polynomial([term([2],False), term([0], True)])]
             c.rulemat = np.array([[1,0],[0,1]])
+            c.inv = np.linalg.inv(c.rulemat)
+            c.inv = np.around(c.inv/np.linalg.det(c.inv)).astype(int)%2
             aut1.blocks = [a, b, c]
             aut1.seq = [3,4,0,1,2]
             aut1.key = automaton.flatten(aut1.blocks)
@@ -373,48 +383,54 @@ class encryption:
 
 def rndbin(n):
     b0 = bin(rnd.getrandbits(n))[2:]
-    print(b0)
     if(len(b0) < n):
         b0 = '0'*(n-len(b0)) + b0
     return b0
 
+def binstr(i,n):
+    b0 = str(bin(i))[2:]
+    if(len(b0) < n):
+        b0 = "0"*(n-len(b0)) + b0
+    return b0    
+
 testC = 0
 n = 5
-t = 3
-style = ''
+t = 2
+style = 'guan'
+guanTest = False
 test = min(2**n,10000)
-bintest = '01100'
+testRan = 100
+B = encryption(n,t,style)
 
 if(testC):
+    #Random Test
     B = encryption(n,t,style)
-    aut0 = B.automatons[0]
-    aut1 = B.automatons[1]
-    print(B)
-    e0 = B.encrypt(bintest)
-    print("b0", bintest)
-    print("cypher", e0)
-    print("decryption")
-    print(B.decrypt(e0))
-    print("done")
+    for i in range(testRan):
+        plain = rndbin(n)
+        e0 = B.encrypt(plain)
+        d0 = B.decrypt(e0)
+        assert plain == d0
+    print("test 1 done")
 else:
-    i = 0
-    while(i < 1):
-        B = encryption(n,t,style)
-#        print("composite: ")
-        print(B)
-        
-        s0 = set([])
-        for i in range(test):
-            b0 = str(bin(i))[2:]
-            if(len(b0) < n):
-                b0 = "0"*(n-len(b0)) + b0
-            e0  = B.encrypt(b0)
-            d0  = B.decrypt(e0)
-            print(b0, e0, d0)
-        #        if(b0 != d0):
-        #            print("<")
-            assert b0 == B.decrypt(e0)
-            s0.add(e0)
-        #        print(b0, e0)
-        print("compuesta:", str(len(s0)) + "/" + str(test))
-        i = i + 1
+    #Exhaustive test (up to 100000)
+    s0 = set([])
+    for i in range(test):
+        b0 = binstr(i, n)
+        e0  = B.encrypt(b0)
+        d0  = B.decrypt(e0)
+        assert b0 == d0
+        s0.add(e0)
+    print("compuesta:", str(len(s0)) + "/" + str(test))
+    print("test 2 done")
+    
+if guanTest:    
+    C = encryption(5,2,'guan')
+    s0 = set([])
+    for i in range(32):
+        b0  = binstr(i, 5)
+        e0  = C.encrypt(b0)
+        d0  = C.decrypt(e0)
+        assert b0 == d0
+        s0.add(e0)
+    print('guan test done')
+
