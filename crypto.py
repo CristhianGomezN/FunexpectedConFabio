@@ -133,23 +133,21 @@ class block:
     
     def generateMatrix(n):
         """Returns an invertible binary matrix of size n."""
-        finish = False
-        while not finish:
-            U = np.identity(n)
-            L = np.identity(n)  
-            #Perform random start
-            for i in range(n):
-                for j in range(i+1,n):
-                    U[i][j]=int(rnd.getrandbits(1))
-                    L[j][i]=int(rnd.getrandbits(1))       
-            M=U.dot(L)
-            M = M%2
-            Mi = np.linalg.inv(M)
-            finish = True
-            for i in range(n):
-                for j in range(n):
-                    if(not float.is_integer(Mi[i][j])):
-                        finish = False 
+        U = np.identity(n)
+        L = np.identity(n)  
+        #Perform random start
+        for i in range(n):
+            for j in range(i+1,n):
+                U[i][j]=int(rnd.getrandbits(1))
+                L[j][i]=int(rnd.getrandbits(1))       
+        M=U.dot(L)
+        M = M%2
+        Mi = np.linalg.inv(M)
+        Mi = np.around(Mi/np.linalg.det(Mi)).astype(int)%2
+        check = np.matmul(M,Mi)
+        check = np.around(check).astype(int)
+        check = check%2
+        assert np.array_equal(check, np.around(np.identity(n)).astype(int))
         return M, Mi
     
     def generateEquations(n, mat, arr, s, automaton):
