@@ -1,14 +1,35 @@
 import numpy as np
-#import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
+import csv
 import matplotlib.pyplot as plt
 
-import csv
+'''
+Object Multilayer_perceptron
+'''
+
+def multilayer_perceptron(x,weights,biases):
+   layer_1 = tf.add(tf.matmul(x,weights['W1']), biases['b1'])
+   layer_1= tf.nn.relu(layer_1)
+#   layer_1_do = tf.nn.dropout(layer_1, keep_prob)
+        
+   out_layer = tf.matmul(layer_1,weights['out']) + biases['out']
+   return out_layer
+    
+
+
+
+'''
+Import Data from Data.csv:
+    Ch:cypher text
+    Plain: plain text
+'''
 
 
 Xdata = []
 Ydata = []
+for i in range(100):
+    Ydata.append([])
 with open('data.csv') as csvfile:
     fieldNames = ['ch','steps','plain']
     read = csv.DictReader(csvfile, fieldnames = fieldNames)
@@ -17,87 +38,104 @@ with open('data.csv') as csvfile:
         Xaux = row['ch']
         Yaux = row['plain']
         aux = []
-        auxa = []
         for i in range(len(Xaux)):
             aux.append(int(Xaux[i]))
-            auxa.append(int(Yaux[i]))
+            if(Yaux[i] == '0'):
+                Ydata[i].append([0,1])
+            else:
+                Ydata[i].append([1,0])
         Xdata.append(aux)
-        Ydata.append(auxa)
 Xdata = np.array(Xdata)
 Ydata = np.array(Ydata)
 
-text_file = open("Output.txt", "w")
 cn = 1
 
-for i in range (400):
-    ######################## prepare the data ########################
-    X = Xdata
-    y = []
-    for j in range (len(Ydata)):
-        y.append([Ydata[j][i]])
-        
-    y = np.array(y)
-    
-    
 
+
+
+'''
+Iteration for each bit
+'''
+
+for i in range (100):
+    '''
+    Prepare the data.
+    '''
+
+    X = Xdata
+    y = Ydata[i]
     X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle = False, test_size = 0.33)
     
+
+    '''
+    Set learning_rate, batch_size and number of iterations (epochs)
+    '''
     
-    ######################## set learning variables ##################
-    learning_rate = 0.000001
-    epochs = 50
-    batch_size = 3
+    learning_rate = 0.28
+    epochs = 100
+    batch_size = 10
     
     
-    ######################## set some variables #######################
-    x = tf.placeholder(tf.float32, [None, 400], name = 'x')   # 3 features
-    y = tf.placeholder(tf.float32, [None, 1], name = 'y')   # 2 outputs
+    '''
+    Define placeholders:
+        X: Input
+        Y: Output
+        Keep_prob: probability using in dropout
+    '''
+    x = tf.placeholder(tf.float32, [None, 100], name = 'x')
+    y = tf.placeholder(tf.float32, [None, 2], name = 'y')
     keep_prob = tf.placeholder("float")
     
     
-    def multilayer_perceptron(x,weights,biases):
-        layer_1 = tf.add(tf.matmul(x,weights['W1']), biases['b1'])
-        layer_1= tf.nn.relu(layer_1)
-        layer_1_do = tf.nn.dropout(layer_1, keep_prob)
-        
-        
-        layer_2 = tf.add(tf.matmul(layer_1_do,weights['W2']), biases['b2'])
-        layer_2= tf.nn.relu(layer_2)
-        
-        out_layer = tf.matmul(layer_2,weights['out']) + biases['out']
-        
-        return out_layer
     
+    
+    '''
+    Define weghts and biases for each layer
+    '''
     
     weights = {
-            'W1': tf.Variable(tf.random_normal([400, 200])),
-            'W2': tf.Variable(tf.random_normal([200, 50])),
-            'out': tf.Variable(tf.random_normal([50, 1]))
+            'W1': tf.Variable(tf.random_normal([100, 50])),
+            'out': tf.Variable(tf.random_normal([50, 2]))
             }
     
     biases = {
-            'b1': tf.Variable(tf.random_normal([200])),
-            'b2': tf.Variable(tf.random_normal([50])),
-            'out': tf.Variable(tf.random_normal([1]))
+            'b1': tf.Variable(tf.random_normal([50])),
+            'out': tf.Variable(tf.random_normal([2]))
             }
      
-        ####################### Loss Function  #########################
+
+    '''
+    Loss function and prediction
+    '''
     y_ = multilayer_perceptron(x,weights,biases)
-    mse = tf.losses.mean_squared_error(y, y_)
+    sfmx = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_,labels=y))
         
         
-        ####################### Optimizer      #########################
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate = learning_rate).minimize(mse)  
+    '''
+    Optimizer (Gradient Descent)
+    '''
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate = learning_rate).minimize(sfmx)  
         
         
-        ###################### Initialize, Accuracy and Run #################
-        # initialize variables
+  
+    '''
+    Initialize variables, define prediction and give accuracy
+    '''
     init_op = tf.global_variables_initializer()
-        
-        # accuracy for the test set
-    accuracy = tf.reduce_mean(tf.square(tf.subtract(y, y_))) # or could use tf.losses.mean_squared_error
-    #run
+    prediction = tf.nn.softmax(y_)
+    correct_pred = tf.equal(tf.argmax(prediction, 1), tf.argmax(y, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    pr = tf.argmax(tf.nn.softmax(y_),1)
+
+
+
+
+    '''
+    Train
+    '''
     with tf.Session() as sess:
+        
+        
          sess.run(init_op)
          total_batch = int(len(y_train) / batch_size)  
          Vals = []
@@ -107,13 +145,16 @@ for i in range (400):
              avg_cost = 0
              for i in range(total_batch):
                   batch_x, batch_y =  X_train[i*batch_size:min(i*batch_size + batch_size, len(X_train)), :], y_train[i*batch_size:min(i*batch_size + batch_size, len(y_train)), :] 
-                  _, c = sess.run([optimizer, mse], feed_dict = {x: batch_x, y: batch_y, keep_prob:.5}) 
+                  _, c = sess.run([optimizer, sfmx], feed_dict = {x: batch_x, y: batch_y, keep_prob:.5}) 
                   avg_cost += c / total_batch
+                  
              if(avg_cost <= 300):
                  Vals.append(avg_cost)
-#             print('Epoch:', (epoch+1), 'cost =', '{:.3f}'.format(avg_cost))
+             print('Epoch:', (epoch+1), 'cost =', avg_cost)
+         plt.title("Learning Curve")
+         plt.xlabel("epoch")
+         plt.ylabel("mean of cross entropy loss")
          plt.plot(Vals)
          plt.show()
-         print(sess.run(mse, feed_dict = {x: X_test, y:y_test, keep_prob:1.0})) 
+         print('Accuracy:', sess.run(accuracy,feed_dict = {x: X_test, y:y_test, keep_prob:1.0} ))
          cn = cn+1
-text_file.close()
